@@ -69,21 +69,21 @@ const identityMatrix = new Float32Array([
     0, 1, 0, 0,
     0, 0, 1, 0,
 ]);
-var matrixSize = identityMatrix.byteLength;
 const rotationRadians = Math.PI / 4;
-const rotationMatrix = new Float32Array([
+const rotationYMatrix = new Float32Array([
     Math.cos(rotationRadians),0,Math.sin(rotationRadians), 0,
     0, 1, 0, 0,
     -Math.sin(rotationRadians),0,Math.cos(rotationRadians), 0,
 ]);
 
+const matrixSize = identityMatrix.byteLength + rotationYMatrix.byteLength;
 const matrixBuffer = device.createBuffer({
     label: "Rotation Buffer",
     size: matrixSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
 });
 device.queue.writeBuffer(matrixBuffer, 0, identityMatrix);
-//device.queue.writeBuffer(matrixBuffer, 0, rotationMatrix); writing twice at 0 just change buffer data
+device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, rotationYMatrix);
 
 
 

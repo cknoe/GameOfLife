@@ -19,13 +19,18 @@ export function cellShaderModule(device) {
                 // outputing cell treated by shader to transmit it to fragment shader
                 @location(0) cell: vec2f,
             };
+
+            struct Matrix {
+                identity: mat3x3f,
+                rotationY: mat3x3f,
+            }
     
             // bind group as uniform variable describing data in the grid uniform buffer 
             @group(0) @binding(0) var<uniform> grid: vec2f;
             // bing group for cell state storage data
             @group(0) @binding(1) var<storage> cellState: array<u32>;
 
-            @group(0) @binding(3) var<uniform> identityUniform: mat3x3f;
+            @group(0) @binding(3) var<uniform> matrixUniform: Matrix;
     
             // vertex shader is valid only when returning at least last vertex position
             @vertex
@@ -38,15 +43,8 @@ export function cellShaderModule(device) {
                 let state = f32(cellState[input.instance]);
     
                 let cellOffset = cell / grid * 2; //we only want to make the cell placed at 1/grid size of canvas (size 2 -1,1)
-                
-                // hardcoded matrix
-                let identity = mat3x3(vec3f(1,0,0), vec3f(0,1,0), vec3f(0,0,1));
-                let theta = f32(radians(45));
-                let yrot = mat3x3(vec3f(cos(theta),0,sin(theta)),vec3f(0,1,0),vec3f(-sin(theta),0,cos(theta)));
-                let zrot = mat3x3(vec3f(cos(theta),-sin(theta),0), vec3f(sin(theta),cos(theta),0), vec3f(0, 0, 1));
-                let xrot = mat3x3(vec3f(1, 0, 0), vec3f(0, cos(theta),sin(theta)), vec3f(0, -sin(theta),cos(theta)));
 
-                let position = identityUniform * input.pos;
+                let position = matrixUniform.rotationY * input.pos;
                 // clip space on z is (0, 1) reducing z and placing it at the center of simulation
                 let projection = vec3f(position.x, position.y, position.z / 10 + 0.5);
                 // placing square center at the top right of the canvas (pos+1 means vertices are placed at their position + (1,1))
@@ -56,8 +54,6 @@ export function cellShaderModule(device) {
                 let squarePos = (projection.xy * state + 1) / grid - 1 + cellOffset;
     
                 output.pos = vec4f(squarePos, projection.z, 1);
-                //output.pos = vec4f(projection, 1);
-                //output.pos = vec4f(input.pos, 1);
                 output.cell = cell;
                 return output;
             }
@@ -164,3 +160,15 @@ export function simulationShaderModule(device, WORKGROUP_SIZE) {
         `
     })
 }
+
+
+
+/* keeping stuff 
+    Matrix transform :
+                let identity = mat3x3(vec3f(1,0,0), vec3f(0,1,0), vec3f(0,0,1));
+                let theta = f32(radians(45));
+                let yrot = mat3x3(vec3f(cos(theta),0,sin(theta)),vec3f(0,1,0),vec3f(-sin(theta),0,cos(theta)));
+                let zrot = mat3x3(vec3f(cos(theta),-sin(theta),0), vec3f(sin(theta),cos(theta),0), vec3f(0, 0, 1));
+                let xrot = mat3x3(vec3f(1, 0, 0), vec3f(0, cos(theta),sin(theta)), vec3f(0, -sin(theta),cos(theta)));
+
+*/
