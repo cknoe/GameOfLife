@@ -3,6 +3,7 @@ import { computePass, renderPass} from './pipelines.js'
 const GRID_SIZE = 32;
 const UPDATE_INTERVAL = 20;
 let step = 0;
+let computePhase = 1;
 const canvas = document.querySelector("canvas");
 const WORKGROUP_SIZE = 8;
 
@@ -226,7 +227,11 @@ function updateGrid() {
     // interface to save gpu commands
     const encoder = device.createCommandEncoder();
 
-    computePass(device, encoder, step, pipelineLayout, bindGroups, WORKGROUP_SIZE, GRID_SIZE)
+    if (step % 40 == 0) {
+        computePhase = (computePhase == 0) ? 1 : 0;
+        computePass(device, encoder, computePhase, pipelineLayout, bindGroups, WORKGROUP_SIZE, GRID_SIZE)
+    }
+
 
     step++;
 
@@ -236,7 +241,7 @@ function updateGrid() {
 
     renderPass(device,
         encoder,
-        step,
+        computePhase,
         context,
         pipelineLayout,
         bindGroups,

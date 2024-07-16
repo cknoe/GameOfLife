@@ -33,11 +33,11 @@ function renderPipeline(device, pipelineLayout, vertexBufferLayout, canvasFormat
 }
 
 // Compute pass
-export function computePass(device, encoder, step, pipelineLayout, bindGroups, WORKGROUP_SIZE, GRID_SIZE) {
+export function computePass(device, encoder, computePhase, pipelineLayout, bindGroups, WORKGROUP_SIZE, GRID_SIZE) {
      // Compute pass
      const computePass = encoder.beginComputePass();
      computePass.setPipeline(computePipeline(device, pipelineLayout, WORKGROUP_SIZE));
-     computePass.setBindGroup(0, bindGroups[step % 2]);
+     computePass.setBindGroup(0, bindGroups[computePhase]);
      // to cover a 32*32 grid with worker sized at 8*8, i want to send 4*4 workgroup (4*8=32)
      const workgroupCount = Math.ceil(GRID_SIZE / WORKGROUP_SIZE);
      computePass.dispatchWorkgroups(workgroupCount, workgroupCount);
@@ -47,7 +47,7 @@ export function computePass(device, encoder, step, pipelineLayout, bindGroups, W
 // Render pass
 export function renderPass(device,
     encoder,
-    step,
+    computePhase,
     context,
     pipelineLayout,
     bindGroups,
@@ -69,7 +69,7 @@ export function renderPass(device,
     // call vertexBuffer at location 0
     pass.setVertexBuffer(0, vertexBuffer);
     // set all @binding from @group(0) in shader are resources of corresponding bind group
-    pass.setBindGroup(0, bindGroups[step % 2]);
+    pass.setBindGroup(0, bindGroups[computePhase]);
     pass.draw(vertices.length / 3, GRID_SIZE * GRID_SIZE); // draw vertices, for number of instances
     pass.end();
 }
