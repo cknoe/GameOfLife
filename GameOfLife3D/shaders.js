@@ -8,8 +8,8 @@ export function cellShaderModule(device) {
             // structure to handle data input and output of shader
             struct VertexInput {
                 // passing vertices positions as argument from vertexBufferLayout at location 0
-                // since format is "float32x2" we pass a vec2f
-                @location(0) pos: vec2f,
+                // since format is "float32x3" we pass a vec3f
+                @location(0) pos: vec3f,
                 // allow this shader to change behaviour depending on instance
                 @builtin(instance_index) instance: u32,
             };
@@ -24,6 +24,8 @@ export function cellShaderModule(device) {
             @group(0) @binding(0) var<uniform> grid: vec2f;
             // bing group for cell state storage data
             @group(0) @binding(1) var<storage> cellState: array<u32>;
+
+            @group(0) @binding(3) var<uniform> identityUniform: mat3x3f;
     
             // vertex shader is valid only when returning at least last vertex position
             @vertex
@@ -36,13 +38,26 @@ export function cellShaderModule(device) {
                 let state = f32(cellState[input.instance]);
     
                 let cellOffset = cell / grid * 2; //we only want to make the cell placed at 1/grid size of canvas (size 2 -1,1)
+                
+                // hardcoded matrix
+                let identity = mat3x3(vec3f(1,0,0), vec3f(0,1,0), vec3f(0,0,1));
+                let theta = f32(radians(45));
+                let yrot = mat3x3(vec3f(cos(theta),0,sin(theta)),vec3f(0,1,0),vec3f(-sin(theta),0,cos(theta)));
+                let zrot = mat3x3(vec3f(cos(theta),-sin(theta),0), vec3f(sin(theta),cos(theta),0), vec3f(0, 0, 1));
+                let xrot = mat3x3(vec3f(1, 0, 0), vec3f(0, cos(theta),sin(theta)), vec3f(0, -sin(theta),cos(theta)));
+
+                let position = identityUniform * input.pos;
+                // clip space on z is (0, 1) reducing z and placing it at the center of simulation
+                let projection = vec3f(position.x, position.y, position.z / 10 + 0.5);
                 // placing square center at the top right of the canvas (pos+1 means vertices are placed at their position + (1,1))
                 // reducing its size to fit GRID_SIZE (/grid)
                 // placing it bottom left of canvas (-1)
                 // placing it at cell (relative to grid) with + cellOffset
-                let squarePos = (input.pos * state + 1) / grid - 1 + cellOffset;
+                let squarePos = (projection.xy * state + 1) / grid - 1 + cellOffset;
     
-                output.pos = vec4f(squarePos, 0, 1);
+                output.pos = vec4f(squarePos, projection.z, 1);
+                //output.pos = vec4f(projection, 1);
+                //output.pos = vec4f(input.pos, 1);
                 output.cell = cell;
                 return output;
             }

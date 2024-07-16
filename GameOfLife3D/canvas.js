@@ -1,27 +1,23 @@
 import { computePass, renderPass} from './pipelines.js'
 
-const GRID_SIZE = 300;
-const UPDATE_INTERVAL = 16;
+const GRID_SIZE = 32;
+const UPDATE_INTERVAL = 1000;
 let step = 0;
 const canvas = document.querySelector("canvas");
-// many hardaware should work with a workgroup size of 64 8*8
 const WORKGROUP_SIZE = 8;
 
-// ---------------- Set up WebGPU
-// Check if browser is compatible with webgpu
+// ---------------- GPU Device
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
 }
-// Check if GPUAdapter exits (relative to hardware)
 const adapter = await navigator.gpu.requestAdapter();
 if (!adapter) {
     throw new Error("No appropriate GPUAdaptater found.");
 }
-//GPUDevice
 const device = await adapter.requestDevice();
 console.log(device.limits);
 
-//----------------- Configure Canvas
+//----------------- Canvas
 const context = canvas.getContext("webgpu");
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 context.configure({
@@ -32,15 +28,17 @@ context.configure({
 //--------------- Preparing Buffer data to draw a square
 // preparing a square, as two triangle (primitive), in canvas space (-1 to 1 2D plane)
 const vertices = new Float32Array([
-    // X,  Y
-    -0.8, -0.8,
-    -0.8, 0.8, 
-    0.8, 0.8,
+    // X,  Y,  Z
+    -0.8, -0.8, 0,
+    -0.8, 0.8, 0,
+    0.8, 0.8, 0,
 
-    -0.8, -0.8,
-    0.8, -0.8, 
-    0.8, 0.8,
+    -0.8, -0.8, 0,
+    0.8, -0.8, 0,
+    0.8, 0.8, 0,
+
 ]);
+
 // creating GPUBuffer object
 const vertexBuffer = device.createBuffer({
     label: "Cell vertices", //Optional
@@ -50,15 +48,68 @@ const vertexBuffer = device.createBuffer({
 });
 // copying vertices array in its memory
 device.queue.writeBuffer(vertexBuffer, /*bufferOffset=*/0, vertices);
+
 // Defining buffer data structure with a GPUVertexBufferLayout
 const vertexBufferLayout = {
-    arrayStride: 8, // Number of bytes between 2 vertices (vertex is defined as two Float32)
+    arrayStride: 12, // Number of bytes between 2 vertices (vertex is defined as 3 Float32)
     attributes: [{
-        format: "float32x2", // GPUVertexFormat
+        format: "float32x3", // GPUVertexFormat
         offset: 0, // Number of bytes before this attribute (only one attribute its 0) 
         shaderLocation: 0,
     }]
 };
+
+/*Scalars (float, int, uint) require 4-byte alignment.
+vec2 requires 8-byte alignment.
+vec3 and vec4 require 16-byte alignment.
+mat3x3 is treated as three vec3s, each padded to 16 bytes.*/
+// meaning I need a 4*3 matrix with zeroes in the last column to represent 3*3 matrix
+const identityMatrix = new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+]);
+var matrixSize = identityMatrix.byteLength;
+const rotationRadians = Math.PI / 4;
+const rotationMatrix = new Float32Array([
+    Math.cos(rotationRadians),0,Math.sin(rotationRadians), 0,
+    0, 1, 0, 0,
+    -Math.sin(rotationRadians),0,Math.cos(rotationRadians), 0,
+]);
+
+const matrixBuffer = device.createBuffer({
+    label: "Rotation Buffer",
+    size: matrixSize,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+});
+device.queue.writeBuffer(matrixBuffer, 0, identityMatrix);
+//device.queue.writeBuffer(matrixBuffer, 0, rotationMatrix); writing twice at 0 just change buffer data
+
+
+
+
+//---------- Some Buffer Logging
+const readBackBuffer = device.createBuffer({
+    size: matrixSize,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+});
+
+const commandEncoder = device.createCommandEncoder();
+commandEncoder.copyBufferToBuffer(matrixBuffer, 0, readBackBuffer, 0, matrixSize);
+const commands = commandEncoder.finish();
+device.queue.submit([commands]);
+
+await readBackBuffer.mapAsync(GPUMapMode.READ);
+const copyArrayBuffer = readBackBuffer.getMappedRange();
+const data = new Float32Array(copyArrayBuffer);
+console.log("Buffer data :")
+console.log(data);
+readBackBuffer.unmap();
+//------------------------------------
+
+
+
+
 
 //-------------- Creating the grid size uniform buffer
 // Create a uniform buffer that describes the grid
@@ -98,26 +149,29 @@ device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
 const bindGroupLayout = device.createBindGroupLayout({
     label: "Cell Bind Group Layout",
     entries: [{
-      binding: 0,
-      visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE, // where we want to use our buffer
-      buffer: {} // Grid uniform buffer (uniform buffer are default type)
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE, // where we want to use our buffer
+        buffer: {} // Grid uniform buffer (uniform buffer are default type)
     }, {
-      binding: 1,
-      visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
-      buffer: { type: "read-only-storage"} // Cell state input buffer
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+        buffer: { type: "read-only-storage"} // Cell state input buffer
     }, {
-      binding: 2,
-      visibility: GPUShaderStage.COMPUTE,
-      buffer: { type: "storage"} // Cell state output buffer
-    }]
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: "storage"} // Cell state output buffer
+    },
+    {
+        binding: 3,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: {} // rotation buffer
+    },]
 });
 
 // GPUBindGroups are immutable, you can't change pointer to resources but can change data
 const bindGroups = [
     device.createBindGroup({
         label: "Cell renderer bind group A",
-        // Pipeline layout is "auto", bind group layout from shader are created
-        // @group(0) from shader
         layout: bindGroupLayout,
         entries: [{
                 // @binding(0) from shader
@@ -131,12 +185,14 @@ const bindGroups = [
             {
                 binding: 2,
                 resource: { buffer: cellStateStorage[1] }
+            },
+            {
+                binding: 3,
+                resource: { buffer: matrixBuffer }
             }],
     }),
     device.createBindGroup({
         label: "Cell renderer bind group B",
-        // Pipeline layout is "auto", bind group layout from shader are created
-        // @group(0) from shader
         layout: bindGroupLayout,
         entries: [{
                 // @binding(0) from shader
@@ -150,6 +206,10 @@ const bindGroups = [
             {
                 binding: 2,
                 resource: { buffer: cellStateStorage[0] }
+            },
+            {
+                binding: 3,
+                resource: { buffer: matrixBuffer }
             }],
     }),
 ];

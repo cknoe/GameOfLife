@@ -70,6 +70,6 @@ export function renderPass(device,
     pass.setVertexBuffer(0, vertexBuffer);
     // set all @binding from @group(0) in shader are resources of corresponding bind group
     pass.setBindGroup(0, bindGroups[step % 2]);
-    pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE); // draw vertices, for number of instances
+    pass.draw(vertices.length / 3, GRID_SIZE * GRID_SIZE); // draw vertices, for number of instances
     pass.end();
 }
