@@ -1,7 +1,7 @@
 import { computePass, renderPass} from './pipelines.js'
 
 const GRID_SIZE = 32;
-const UPDATE_INTERVAL = 1000;
+const UPDATE_INTERVAL = 20;
 let step = 0;
 const canvas = document.querySelector("canvas");
 const WORKGROUP_SIZE = 8;
@@ -69,22 +69,23 @@ const identityMatrix = new Float32Array([
     0, 1, 0, 0,
     0, 0, 1, 0,
 ]);
-const rotationRadians = Math.PI / 4;
-const rotationYMatrix = new Float32Array([
-    Math.cos(rotationRadians),0,Math.sin(rotationRadians), 0,
-    0, 1, 0, 0,
-    -Math.sin(rotationRadians),0,Math.cos(rotationRadians), 0,
-]);
+const rotationRadians = Math.PI;
+function rotationMatrixFunction(theta) {
+    return new Float32Array([
+        Math.cos(theta),0,Math.sin(theta), 0,
+        0, 1, 0, 0,
+        -Math.sin(theta),0,Math.cos(theta), 0,
+    ]);
+}
+var rotationMatrix = rotationMatrixFunction(rotationRadians);
 
-const matrixSize = identityMatrix.byteLength + rotationYMatrix.byteLength;
+const matrixSize = identityMatrix.byteLength + rotationMatrix.byteLength;
 const matrixBuffer = device.createBuffer({
     label: "Rotation Buffer",
     size: matrixSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
 });
 device.queue.writeBuffer(matrixBuffer, 0, identityMatrix);
-device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, rotationYMatrix);
-
 
 
 
@@ -228,6 +229,10 @@ function updateGrid() {
     computePass(device, encoder, step, pipelineLayout, bindGroups, WORKGROUP_SIZE, GRID_SIZE)
 
     step++;
+
+
+    rotationMatrix = rotationMatrixFunction(((step * 5) % 180) * (Math.PI/180));
+    device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, rotationMatrix);
 
     renderPass(device,
         encoder,

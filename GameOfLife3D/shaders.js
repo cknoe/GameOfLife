@@ -47,6 +47,8 @@ export function cellShaderModule(device) {
                 let position = matrixUniform.rotationY * input.pos;
                 // clip space on z is (0, 1) reducing z and placing it at the center of simulation
                 let projection = vec3f(position.x, position.y, position.z / 10 + 0.5);
+                //output.pos = vec4f(projection, 1); Rendering square not placed an minimized
+                
                 // placing square center at the top right of the canvas (pos+1 means vertices are placed at their position + (1,1))
                 // reducing its size to fit GRID_SIZE (/grid)
                 // placing it bottom left of canvas (-1)
