@@ -22,7 +22,8 @@ export function cellShaderModule(device) {
 
             struct Matrix {
                 identity: mat3x3f,
-                rotationY: mat3x3f,
+                rotation_y: mat3x3f,
+                rotation_x: mat3x3f,
             }
     
             // bind group as uniform variable describing data in the grid uniform buffer 
@@ -40,22 +41,33 @@ export function cellShaderModule(device) {
                 // converting instance number as 32-bit floating point
                 let instance = f32(input.instance);
                 let cell  = vec2f(instance % grid.x, floor(instance / grid.x)); //targeting cell grid depending on instance
-                let state = f32(cellState[input.instance]);
+                //let state = f32(cellState[input.instance]);
     
                 let cellOffset = cell / grid * 2; //we only want to make the cell placed at 1/grid size of canvas (size 2 -1,1)
 
-                let position = matrixUniform.rotationY * input.pos;
-                // clip space on z is (0, 1) reducing z and placing it at the center of simulation
-                let projection = vec3f(position.x, position.y, position.z / 10 + 0.5);
                 //output.pos = vec4f(projection, 1); Rendering square not placed an minimized
-                
+
+                let rotation = matrixUniform.rotation_y * matrixUniform.rotation_x;
+
+                let scaleMatrix = mat3x3(
+                    vec3f(0.8/grid.x, 0, 0),
+                    vec3f(0, 0.8/grid.x, 0),
+                    vec3f(0, 0, 0.8/grid.x),
+                );
+
+                let translateVector = vec3f(cellOffset - (grid-1)/grid, 0) ;
+
                 // placing square center at the top right of the canvas (pos+1 means vertices are placed at their position + (1,1))
                 // reducing its size to fit GRID_SIZE (/grid)
                 // placing it bottom left of canvas (-1)
                 // placing it at cell (relative to grid) with + cellOffset
-                let squarePos = (projection.xy * state + 1) / grid - 1 + cellOffset;
+                //let squarePos = scaleMatrix * (position * state + 1) - 1 + vec3f(cellOffset, 0);
+                let position = scaleMatrix * (rotation * input.pos) + translateVector;
     
-                output.pos = vec4f(squarePos, projection.z, 1);
+                // clip space on z is (0, 1) reducing z and placing it at the center of simulation
+                let projection = vec3f(position.xy, position.z / 10 + 0.5);
+
+                output.pos = vec4f(projection, 1);
                 output.cell = cell;
                 return output;
             }
@@ -65,45 +77,14 @@ export function cellShaderModule(device) {
             // retrieving output of vertex shader
             fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
                 // making red an green value depends on cell x and y
+                let state = f32(cellState[u32(input.cell.x + 1) * u32(input.cell.y + 1)]);
                 let cellRedGreen = input.cell / grid;
                 // calculating blue depending on red value
-                return vec4f(cellRedGreen, 1 - cellRedGreen.x ,1);
+                return vec4f(cellRedGreen * state , (1 - cellRedGreen.x) * state ,1);
             }
         `
     });
 }
-
-code:/* wgsl */`
-        struct VertexOutput {
-            @builtin(position) position: vec4f,
-            @location(0) cell: vec2f,
-          };
-
-          @group(0) @binding(0) var<uniform> grid: vec2f;
-          @group(0) @binding(1) var<storage> cellState: array<u32>;
-
-          @vertex
-          fn vertexMain(@location(0) position: vec2f,
-                        @builtin(instance_index) instance: u32) -> VertexOutput {
-            var output: VertexOutput;
-
-            let i = f32(instance);
-            let cell = vec2f(i % grid.x, floor(i / grid.x));
-
-            let scale = f32(cellState[instance]);
-            let cellOffset = cell / grid * 2;
-            let gridPos = (position*scale+1) / grid - 1 + cellOffset;
-
-            output.position = vec4f(gridPos, 0, 1);
-            output.cell = cell / grid;
-            return output;
-          }
-
-          @fragment
-          fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-            return vec4f(input.cell, 1.0 - input.cell.x, 1);
-          }
-        `
 
 // Create a compute shader to manage the simulation
 // compute shaders don't have expected input or output

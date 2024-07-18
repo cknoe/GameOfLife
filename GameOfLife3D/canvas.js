@@ -3,6 +3,7 @@ import { computePass, renderPass} from './pipelines.js'
 const GRID_SIZE = 32;
 const UPDATE_INTERVAL = 20;
 let step = 0;
+let RUN_SIMULATION = 1;
 let computePhase = 1;
 const canvas = document.querySelector("canvas");
 const WORKGROUP_SIZE = 8;
@@ -30,14 +31,53 @@ context.configure({
 // preparing a square, as two triangle (primitive), in canvas space (-1 to 1 2D plane)
 const vertices = new Float32Array([
     // X,  Y,  Z
-    -0.8, -0.8, 0,
-    -0.8, 0.8, 0,
-    0.8, 0.8, 0,
+    -0.8, -0.8, -0.8,
+    -0.8, 0.8, -0.8,
+    0.8, 0.8, -0.8,
 
-    -0.8, -0.8, 0,
-    0.8, -0.8, 0,
-    0.8, 0.8, 0,
+    -0.8, -0.8, -0.8,
+    0.8, -0.8, -0.8,
+    0.8, 0.8, -0.8,
+    // 2
+    -0.8, -0.8, -0.8,
+    -0.8, -0.8, 0.8,
+    0.8, -0.8,  0.8,
 
+    -0.8, -0.8, -0.8,
+    0.8, -0.8, -0.8,
+    0.8, -0.8, 0.8,
+    // 3
+    -0.8, -0.8, -0.8,
+    -0.8, 0.8, -0.8,
+    -0.8, 0.8, 0.8,
+
+    -0.8, -0.8, -0.8,
+    -0.8, -0.8, 0.8,
+    -0.8, 0.8, 0.8,
+    // 4
+    0.8, -0.8, -0.8,
+    0.8, 0.8, -0.8,
+    0.8, 0.8, 0.8,
+
+    0.8, -0.8, -0.8,
+    0.8, -0.8, 0.8,
+    0.8, 0.8, 0.8,
+    // 5
+    -0.8, 0.8, -0.8,
+    -0.8, 0.8, 0.8,
+    0.8, 0.8, 0.8,
+
+    -0.8, 0.8, -0.8,
+    0.8, 0.8, -0.8,
+    0.8, 0.8, 0.8,
+    // 6
+    -0.8, -0.8, 0.8,
+    -0.8, 0.8, 0.8,
+    0.8, 0.8, 0.8,
+
+    -0.8, -0.8, 0.8,
+    0.8, -0.8, 0.8,
+    0.8, 0.8, 0.8,
 ]);
 
 // creating GPUBuffer object
@@ -71,18 +111,27 @@ const identityMatrix = new Float32Array([
     0, 0, 1, 0,
 ]);
 const rotationRadians = Math.PI;
-function rotationMatrixFunction(theta) {
+function rotationYMatrixFunction(theta) {
     return new Float32Array([
-        Math.cos(theta),0,Math.sin(theta), 0,
+        Math.cos(theta), 0, Math.sin(theta), 0,
         0, 1, 0, 0,
-        -Math.sin(theta),0,Math.cos(theta), 0,
+        -Math.sin(theta), 0, Math.cos(theta), 0,
     ]);
 }
-var rotationMatrix = rotationMatrixFunction(rotationRadians);
+var rotationYMatrix = rotationYMatrixFunction(rotationRadians);
 
-const matrixSize = identityMatrix.byteLength + rotationMatrix.byteLength;
+function rotationXMatrixFunction(theta) {
+    return new Float32Array([
+        1, 0, 0, 0,
+        0, Math.cos(theta), Math.sin(theta), 0,
+        0, -Math.sin(theta), Math.cos(theta), 0,
+    ]);
+}
+var rotationXMatrix = rotationXMatrixFunction(rotationRadians);
+
+const matrixSize = identityMatrix.byteLength + rotationYMatrix.byteLength + rotationXMatrix.byteLength;
 const matrixBuffer = device.createBuffer({
-    label: "Rotation Buffer",
+    label: "Matrix Buffer",
     size: matrixSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
 });
@@ -141,7 +190,8 @@ const cellStateStorage = [
     })
 ];
 for (let i = 0; i < cellStateArray.length; ++i) {
-    cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;;
+    cellStateArray[i] = Math.random() > 0.6 ? 1 : 0;
+    //cellStateArray[i] = 1;
 }
 device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
 
@@ -156,7 +206,7 @@ const bindGroupLayout = device.createBindGroupLayout({
         buffer: {} // Grid uniform buffer (uniform buffer are default type)
     }, {
         binding: 1,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+        visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
         buffer: { type: "read-only-storage"} // Cell state input buffer
     }, {
         binding: 2,
@@ -227,7 +277,7 @@ function updateGrid() {
     // interface to save gpu commands
     const encoder = device.createCommandEncoder();
 
-    if (step % 40 == 0) {
+    if ((step % 40 == 0) && (RUN_SIMULATION)) {
         computePhase = (computePhase == 0) ? 1 : 0;
         computePass(device, encoder, computePhase, pipelineLayout, bindGroups, WORKGROUP_SIZE, GRID_SIZE)
     }
@@ -236,8 +286,10 @@ function updateGrid() {
     step++;
 
 
-    rotationMatrix = rotationMatrixFunction(((step * 5) % 180) * (Math.PI/180));
+    let rotationMatrix = rotationYMatrixFunction(((step * 2) % 180) * (Math.PI/180));
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, rotationMatrix);
+    rotationMatrix = rotationXMatrixFunction(((step * 2) % 180) * (Math.PI/180));
+    device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + rotationMatrix.byteLength, rotationMatrix);
 
     renderPass(device,
         encoder,
