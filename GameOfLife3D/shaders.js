@@ -77,7 +77,7 @@ export function cellShaderModule(device) {
             // retrieving output of vertex shader
             fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
                 // making red an green value depends on cell x and y
-                let state = f32(cellState[u32(input.cell.x + 1) * u32(input.cell.y + 1)]);
+                let state = f32(cellState[u32(input.cell.x) + u32(input.cell.y) * u32(grid.x)]);
                 let cellRedGreen = input.cell / grid;
                 // calculating blue depending on red value
                 return vec4f(cellRedGreen * state , (1 - cellRedGreen.x) * state ,1);
