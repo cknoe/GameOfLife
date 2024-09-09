@@ -154,4 +154,12 @@ export function simulationShaderModule(device, WORKGROUP_SIZE) {
                 let zrot = mat3x3(vec3f(cos(theta),-sin(theta),0), vec3f(sin(theta),cos(theta),0), vec3f(0, 0, 1));
                 let xrot = mat3x3(vec3f(1, 0, 0), vec3f(0, cos(theta),sin(theta)), vec3f(0, -sin(theta),cos(theta)));
 
+3D Life rules :
+    A live cell with fewer than 4 live neighbors dies (underpopulation).
+    A live cell with 4, 5, or 6 live neighbors survives to the next generation.
+    A live cell with more than 6 live neighbors dies (overpopulation).
+    A dead cell with exactly 5 live neighbors becomes a live cell (reproduction).
+
+
+
 */
