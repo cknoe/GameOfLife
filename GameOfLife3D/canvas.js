@@ -8,7 +8,7 @@ let computePhase = 1;
 const canvas = document.querySelector("canvas");
 const WORKGROUP_SIZE = 8;
 
-// ---------------- GPU Device
+// ------------------------------------------------ GPU Device ------------------------------------------------
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
 }
@@ -19,7 +19,7 @@ if (!adapter) {
 const device = await adapter.requestDevice();
 console.log(device.limits);
 
-//----------------- Canvas
+// ------------------------------------------------ Canvas ------------------------------------------------
 const context = canvas.getContext("webgpu");
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 context.configure({
@@ -27,7 +27,7 @@ context.configure({
     format: canvasFormat, //texture format
 });
 
-//--------------- Preparing Buffer data to draw a square
+// ------------------------------------------------ Vertices ------------------------------------------------
 // preparing a square, as two triangle (primitive), in canvas space (-1 to 1 2D plane)
 const vertices = new Float32Array([
     // X,  Y,  Z, texture.x, texture.y
@@ -107,7 +107,7 @@ const vertexBufferLayout = {
 };
 
 
-// Texture
+// ------------------------------------------------ Texture ------------------------------------------------
 const textureWidth = 5;
 const textureHeight = 7;
 
@@ -139,6 +139,44 @@ device.queue.writeTexture(
 
 const sampler = device.createSampler();
 
+// ------------------------------------------------ Depth Stencil ------------------------------------------------
+
+let depthStencilState = { //GPUDepthStenciState
+    format: "depth24plus-stencil8",
+    depthWriteEnabled: true,
+    depthCompare: "less-equal",
+};
+
+// create depth texture
+const depthTextureSize = { //GPUExtent3D
+    width: canvas.width,
+    height: canvas.height,
+    depthOrArrayLayers: 1,
+};
+const depthBufferDescriptor = { //GPUTextureDescriptor
+    size: depthTextureSize,
+    format: "depth24plus-stencil8",
+    usage:GPUTextureUsage.RENDER_ATTACHMENT,
+};
+const depthStencilBuffer = device.createTexture(depthBufferDescriptor);
+
+// Create depth stencil view
+const viewDescriptor = { //GPUTextureViewDescriptor
+    format: "depth24plus-stencil8",
+    dimension: "2d",
+    aspect: "all"
+};
+const depthStencilView = depthStencilBuffer.createView(viewDescriptor);
+
+const depthStencilAttachment = {
+    view: depthStencilView,
+    depthClearValue: 1.0,
+    depthLoadOp: "clear",
+    depthStoreOp: "store",
+    stencilLoadOp: "clear",
+    stencilStoreOp: "discard",// not using this value
+};
+// ------------------------------------------------ Matrices ------------------------------------------------
 /*Scalars (float, int, uint) require 4-byte alignment.
 vec2 requires 8-byte alignment.
 vec3 and vec4 require 16-byte alignment.
@@ -201,7 +239,7 @@ readBackBuffer.unmap();
 
 
 
-//-------------- Creating the grid size uniform buffer
+// ------------------------------------------------ Creating the grid size uniform buffer ------------------------------------------------
 // Create a uniform buffer that describes the grid
 /* Uniform buffer are used to pass data that stay identical each time they're called
 (compared to Vertex buffer which pass different value from its data each time its called)*/
@@ -213,7 +251,7 @@ const uniformBuffer = device.createBuffer({
 });
 device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
 
-//-------------- Creating Grid state storage buffer
+// ------------------------------------------------ Creating Grid state storage buffer ------------------------------------------------
 // create a storage buffer representing grid (to activate cells)
 const cellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
 const cellStateStorage = [
@@ -234,7 +272,7 @@ for (let i = 0; i < cellStateArray.length; ++i) {
 }
 device.queue.writeBuffer(cellStateStorage[0], 0, cellStateArray);
 
-//--------------- Creating Bind Group
+// ------------------------------------------------ Creating Bind Group ------------------------------------------------
 // Bind groups are ressources that we want topass to our shader like different buffers
 // Create a GPUBindGroupLayout wich will allow to share bind groups between pipelines
 const bindGroupLayout = device.createBindGroupLayout({
@@ -337,7 +375,7 @@ const pipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [ bindGroupLayout ], //at index 0 bindGroupLayout is the @group(0) from shader
 });
 
-//------------------- Render & Compute pass
+// ------------------------------------------------ Render & Compute pass ------------------------------------------------
 function updateGrid() {
     // interface to save gpu commands
     const encoder = device.createCommandEncoder();
@@ -351,9 +389,9 @@ function updateGrid() {
     step++;
 
 
-    let rotationMatrix = rotationYMatrixFunction(((step * 2) % 180) * (Math.PI/180));
+    let rotationMatrix = rotationYMatrixFunction(((step * 2) % 360) * (Math.PI/180));
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, rotationMatrix);
-    rotationMatrix = rotationXMatrixFunction(((step * 2) % 180) * (Math.PI/180));
+    rotationMatrix = rotationXMatrixFunction(((step * 2) % 360) * (Math.PI/180));
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + rotationMatrix.byteLength, rotationMatrix);
 
     renderPass(device,
@@ -366,7 +404,9 @@ function updateGrid() {
         vertexBuffer,
         canvasFormat,
         GRID_SIZE,
-        vertices)
+        vertices,
+        depthStencilState,
+        depthStencilAttachment)
 
     // creating pass does nothing, it needs to be called as a GPUCommandBuffer by the device queue
     /*const commandBuffer = encoder.finish();

@@ -13,7 +13,7 @@ function computePipeline(device, pipelineLayout, WORKGROUP_SIZE) {
 }
 
 //Render pipeline
-function renderPipeline(device, pipelineLayout, vertexBufferLayout, canvasFormat) {
+function renderPipeline(device, pipelineLayout, vertexBufferLayout, canvasFormat, depthStencilState) {
     return device.createRenderPipeline({
         label: "Cell pipeline",
         layout: pipelineLayout,
@@ -28,7 +28,8 @@ function renderPipeline(device, pipelineLayout, vertexBufferLayout, canvasFormat
             targets: [{
                 format: canvasFormat //needs to match color attachments of render pass
             }]
-        }
+        },
+        depthStencil: depthStencilState
     });
 }
 
@@ -45,7 +46,8 @@ export function computePass(device, encoder, computePhase, pipelineLayout, bindG
 }
 
 // Render pass
-export function renderPass(device,
+export function renderPass(
+    device,
     encoder,
     computePhase,
     context,
@@ -54,22 +56,26 @@ export function renderPass(device,
     vertexBufferLayout,
     vertexBuffer,
     canvasFormat,
-    GRID_SIZE, vertices) {
+    GRID_SIZE,
+    vertices,
+    depthStencilState,
+    depthStencilAttachment) {
     const pass = encoder.beginRenderPass({
         colorAttachments: [{
             view: context.getCurrentTexture().createView(), // texture
             loadOp: "clear", //  clear canvas
             clearValue: { r: 0, g: 0.3, b: 0.2, a: 1 },
             storeOp: "store",
-        }]
+        }],
+        depthStencilAttachment: depthStencilAttachment,
     });
 
     // call shader
-    pass.setPipeline(renderPipeline(device, pipelineLayout, vertexBufferLayout, canvasFormat));
+    pass.setPipeline(renderPipeline(device, pipelineLayout, vertexBufferLayout, canvasFormat, depthStencilState));
     // call vertexBuffer at location 0
     pass.setVertexBuffer(0, vertexBuffer);
     // set all @binding from @group(0) in shader are resources of corresponding bind group
     pass.setBindGroup(0, bindGroups[computePhase]);
-    pass.draw(vertices.length / 5, GRID_SIZE * GRID_SIZE); // draw vertices, for number of instances
+    pass.draw(vertices.length / 5, GRID_SIZE * GRID_SIZE); // draw vertices (one vertex is 5 float), for number of instances
     pass.end();
 }

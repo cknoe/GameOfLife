@@ -70,8 +70,8 @@ export function cellShaderModule(device) {
                 //let squarePos = scaleMatrix * (position * state + 1) - 1 + vec3f(cellOffset, 0);
                 let position = scaleMatrix * (rotation * input.pos) + translateVector;
     
-                // clip space on z is (0, 1) reducing z and placing it at the center of simulation
-                let projection = vec3f(position.xy, position.z / 10 + 0.5);
+                // clip space on z is (0, 1) placing it at the center of simulation
+                let projection = vec3f(position.xy / 2, position.z + 0.5);
                 output.pos = vec4f(projection, 1);
                 output.tex_coord = input.tex_coord;
                 output.cell = cell;
