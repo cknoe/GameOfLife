@@ -1,6 +1,6 @@
 import { computePass, renderPass} from './pipelines.js'
 
-const GRID_SIZE = 32;
+const GRID_SIZE = 16;
 const UPDATE_INTERVAL = 20;
 let step = 0;
 let RUN_SIMULATION = 1;
@@ -30,54 +30,54 @@ context.configure({
 //--------------- Preparing Buffer data to draw a square
 // preparing a square, as two triangle (primitive), in canvas space (-1 to 1 2D plane)
 const vertices = new Float32Array([
-    // X,  Y,  Z
-    -0.8, -0.8, -0.8,
-    -0.8, 0.8, -0.8,
-    0.8, 0.8, -0.8,
+    // X,  Y,  Z, texture.x, texture.y
+    -0.8, -0.8, -0.8, 0, 0,
+    -0.8, 0.8, -0.8, 0, 1,
+    0.8, 0.8, -0.8, 1, 1,
 
-    -0.8, -0.8, -0.8,
-    0.8, -0.8, -0.8,
-    0.8, 0.8, -0.8,
+    -0.8, -0.8, -0.8, 0, 0,
+    0.8, -0.8, -0.8, 1, 0,
+    0.8, 0.8, -0.8, 1, 1,
     // 2
-    -0.8, -0.8, -0.8,
-    -0.8, -0.8, 0.8,
-    0.8, -0.8,  0.8,
+    -0.8, -0.8, -0.8, 0, 0,
+    -0.8, -0.8, 0.8, 0, 1,
+    0.8, -0.8,  0.8, 1, 1,
 
-    -0.8, -0.8, -0.8,
-    0.8, -0.8, -0.8,
-    0.8, -0.8, 0.8,
+    -0.8, -0.8, -0.8, 0, 0,
+    0.8, -0.8, -0.8, 1, 0,
+    0.8, -0.8, 0.8, 1, 1,
     // 3
-    -0.8, -0.8, -0.8,
-    -0.8, 0.8, -0.8,
-    -0.8, 0.8, 0.8,
+    -0.8, -0.8, -0.8, 0, 0,
+    -0.8, 0.8, -0.8, 0, 1,
+    -0.8, 0.8, 0.8, 1, 1,
 
-    -0.8, -0.8, -0.8,
-    -0.8, -0.8, 0.8,
-    -0.8, 0.8, 0.8,
+    -0.8, -0.8, -0.8, 0, 0,
+    -0.8, -0.8, 0.8, 1, 0,
+    -0.8, 0.8, 0.8, 1, 1,
     // 4
-    0.8, -0.8, -0.8,
-    0.8, 0.8, -0.8,
-    0.8, 0.8, 0.8,
+    0.8, -0.8, -0.8, 0, 0,
+    0.8, 0.8, -0.8, 0, 1,
+    0.8, 0.8, 0.8, 1, 1,
 
-    0.8, -0.8, -0.8,
-    0.8, -0.8, 0.8,
-    0.8, 0.8, 0.8,
+    0.8, -0.8, -0.8, 0, 0,
+    0.8, -0.8, 0.8, 1, 0,
+    0.8, 0.8, 0.8, 1, 1,
     // 5
-    -0.8, 0.8, -0.8,
-    -0.8, 0.8, 0.8,
-    0.8, 0.8, 0.8,
+    -0.8, 0.8, -0.8, 0, 0,
+    -0.8, 0.8, 0.8, 0, 1,
+    0.8, 0.8, 0.8, 1, 1,
 
-    -0.8, 0.8, -0.8,
-    0.8, 0.8, -0.8,
-    0.8, 0.8, 0.8,
+    -0.8, 0.8, -0.8, 0, 0,
+    0.8, 0.8, -0.8, 1, 0,
+    0.8, 0.8, 0.8, 1, 1,
     // 6
-    -0.8, -0.8, 0.8,
-    -0.8, 0.8, 0.8,
-    0.8, 0.8, 0.8,
+    -0.8, -0.8, 0.8, 0, 0,
+    -0.8, 0.8, 0.8, 0, 1,
+    0.8, 0.8, 0.8, 1, 1,
 
-    -0.8, -0.8, 0.8,
-    0.8, -0.8, 0.8,
-    0.8, 0.8, 0.8,
+    -0.8, -0.8, 0.8, 0, 0,
+    0.8, -0.8, 0.8, 1, 0,
+    0.8, 0.8, 0.8, 1, 1,
 ]);
 
 // creating GPUBuffer object
@@ -92,13 +92,52 @@ device.queue.writeBuffer(vertexBuffer, /*bufferOffset=*/0, vertices);
 
 // Defining buffer data structure with a GPUVertexBufferLayout
 const vertexBufferLayout = {
-    arrayStride: 12, // Number of bytes between 2 vertices (vertex is defined as 3 Float32)
+    arrayStride: 20, // Number of bytes between 2 vertices (vertex is defined as 3 Float32)
     attributes: [{
         format: "float32x3", // GPUVertexFormat
         offset: 0, // Number of bytes before this attribute (only one attribute its 0) 
         shaderLocation: 0,
-    }]
+    },
+    {
+        format: "float32x2", // GPUVertexFormat
+        offset: 12, // Number of bytes before this attribute
+        shaderLocation: 1,
+    }
+]
 };
+
+
+// Texture
+const textureWidth = 5;
+const textureHeight = 7;
+
+const _ = [255,   0,   0, 255];  // red
+const y = [255, 255,   0, 255];  // yellow
+const b = [  0,   0, 255, 255];  // blue
+const textureData = new Uint8Array([
+  b, _, _, _, _,
+  _, y, y, y, _,
+  _, y, _, _, _,
+  _, y, y, _, _,
+  _, y, _, _, _,
+  _, y, _, _, _,
+  _, _, _, _, _,
+].flat());
+
+const texture = device.createTexture({
+    size: [textureWidth, textureHeight],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+
+device.queue.writeTexture(
+    { texture },
+    textureData,
+    { bytesPerRow: textureWidth * 4 },
+    { width: textureWidth, height: textureHeight },
+);
+
+const sampler = device.createSampler();
 
 /*Scalars (float, int, uint) require 4-byte alignment.
 vec2 requires 8-byte alignment.
@@ -217,6 +256,16 @@ const bindGroupLayout = device.createBindGroupLayout({
         binding: 3,
         visibility: GPUShaderStage.VERTEX,
         buffer: {} // rotation buffer
+    },
+    {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: {} // sampler
+    },
+    {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {} // texture
     },]
 });
 
@@ -241,6 +290,14 @@ const bindGroups = [
             {
                 binding: 3,
                 resource: { buffer: matrixBuffer }
+            },
+            {
+                binding: 4,
+                resource: sampler 
+            },
+            {
+                binding: 5,
+                resource: texture.createView()
             }],
     }),
     device.createBindGroup({
@@ -262,6 +319,14 @@ const bindGroups = [
             {
                 binding: 3,
                 resource: { buffer: matrixBuffer }
+            },
+            {
+                binding: 4,
+                resource: sampler
+            },
+            {
+                binding: 5,
+                resource: texture.createView()
             }],
     }),
 ];

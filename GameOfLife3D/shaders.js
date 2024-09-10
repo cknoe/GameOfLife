@@ -10,6 +10,7 @@ export function cellShaderModule(device) {
                 // passing vertices positions as argument from vertexBufferLayout at location 0
                 // since format is "float32x3" we pass a vec3f
                 @location(0) pos: vec3f,
+                @location(1) tex_coord: vec2f,
                 // allow this shader to change behaviour depending on instance
                 @builtin(instance_index) instance: u32,
             };
@@ -17,7 +18,8 @@ export function cellShaderModule(device) {
             struct VertexOutput {
                 @builtin(position) pos: vec4f,
                 // outputing cell treated by shader to transmit it to fragment shader
-                @location(0) cell: vec2f,
+                @location(0) tex_coord: vec2f,
+                @location(1) cell: vec2f,
             };
 
             struct Matrix {
@@ -32,6 +34,10 @@ export function cellShaderModule(device) {
             @group(0) @binding(1) var<storage> cellState: array<u32>;
 
             @group(0) @binding(3) var<uniform> matrixUniform: Matrix;
+
+            @group(0) @binding(4) var textureSampler: sampler;
+            
+            @group(0) @binding(5) var faceTexture: texture_2d<f32>;
     
             // vertex shader is valid only when returning at least last vertex position
             @vertex
@@ -66,8 +72,8 @@ export function cellShaderModule(device) {
     
                 // clip space on z is (0, 1) reducing z and placing it at the center of simulation
                 let projection = vec3f(position.xy, position.z / 10 + 0.5);
-
                 output.pos = vec4f(projection, 1);
+                output.tex_coord = input.tex_coord;
                 output.cell = cell;
                 return output;
             }
@@ -78,9 +84,15 @@ export function cellShaderModule(device) {
             fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
                 // making red an green value depends on cell x and y
                 let state = f32(cellState[u32(input.cell.x) + u32(input.cell.y) * u32(grid.x)]);
-                let cellRedGreen = input.cell / grid;
+                // let cellRedGreen = input.cell / grid;
                 // calculating blue depending on red value
-                return vec4f(cellRedGreen * state , (1 - cellRedGreen.x) * state ,1);
+                // return vec4f(cellRedGreen * state , (1 - cellRedGreen.x) * state ,1);
+                let texture_sample = textureSample(faceTexture, textureSampler, input.tex_coord);
+                if (state == 1) {
+                    return texture_sample;
+                } else {
+                    return vec4f(0);
+                }
             }
         `
     });
