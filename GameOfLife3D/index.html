@@ -1,13 +1,38 @@
 <!doctype html>
-
 <html>
     <head>
         <meta charset="utf-8">
         <title>WebGPU Life</title>
+        <style>
+            body {
+                display: flex;
+                flex-direction: column;
+            }
+            .container {
+                display: flex;
+                align-items: flex-start;
+            }
+            .content {
+                display: flex;
+                flex-direction: column;
+                margin-left: 20px;
+            }
+            canvas {
+                border: 1px solid black; 
+            }
+            a {
+                margin-top: 20px;
+            }
+        </style>
     </head>
     <body>
-        <canvas width="800" height="800"></canvas>
-        <br>
+        <div class="container">
+            <canvas width="800" height="800"></canvas>
+            <div class="content">
+                <h3>Click on canvas to control camera</h3>
+                <h3>Press escape to use mouse normally</h3>
+            </div>
+        </div>
         <a href="../GameOfLife2D/index.html">Go to GameOfLife2D</a>
         <script type="module" src="./canvas.js"></script>
     </body>

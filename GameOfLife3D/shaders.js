@@ -38,7 +38,9 @@ export function cellShaderModule(device) {
 
             @group(0) @binding(4) var textureSampler: sampler;
             
-            @group(0) @binding(5) var faceTexture: texture_2d<f32>;
+            @group(0) @binding(5) var faceOnTexture: texture_2d<f32>;
+
+            @group(0) @binding(6) var faceOffTexture: texture_2d<f32>;
     
             // vertex shader is valid only when returning at least last vertex position
             @vertex
@@ -52,8 +54,6 @@ export function cellShaderModule(device) {
     
                 let cellOffset = cell / grid * 2; //we only want to make the cell placed at 1/grid size of canvas (size 2 -1,1)
 
-                //output.pos = vec4f(projection, 1); Rendering square not placed an minimized
-
                 let rotation = matrixUniform.rotation_x * matrixUniform.rotation_y;
 
                 let scaleMatrix = mat4x4(
@@ -65,15 +65,10 @@ export function cellShaderModule(device) {
 
                 let translateVector = vec4f(cellOffset - (grid-1)/grid, 0, 0) ;
 
-                // placing square center at the top right of the canvas (pos+1 means vertices are placed at their position + (1,1))
-                // reducing its size to fit GRID_SIZE (/grid)
-                // placing it bottom left of canvas (-1)
-                // placing it at cell (relative to grid) with + cellOffset
-                //let squarePos = scaleMatrix * (position * state + 1) - 1 + vec3f(cellOffset, 0);
+                // Why do i need to move my vertices towards me when using orthographic projection ?
                 let position = rotation * (scaleMatrix * vec4f(input.pos, 1) + translateVector) + vec4f(0, 0, -15, 0);
-                //let position = vec4f(input.pos, 1);
     
-                let projection = matrixUniform.orthographic_projection * vec4f(position.xy / 2, position.z, 1);
+                let projection = matrixUniform.orthographic_projection * vec4f(position.xy / 1.5, position.z, 1);
                 output.pos = projection;
                 output.tex_coord = input.tex_coord;
                 output.cell = cell;
@@ -89,11 +84,12 @@ export function cellShaderModule(device) {
                 // let cellRedGreen = input.cell / grid;
                 // calculating blue depending on red value
                 // return vec4f(cellRedGreen * state , (1 - cellRedGreen.x) * state ,1);
-                let texture_sample = textureSample(faceTexture, textureSampler, input.tex_coord);
+                let texture_on_sample = textureSample(faceOnTexture, textureSampler, input.tex_coord);
+                let texture_off_sample = textureSample(faceOffTexture, textureSampler, input.tex_coord);
                 if (state == 1) {
-                    return texture_sample;
+                    return texture_on_sample;
                 } else {
-                    return vec4f(0);
+                    return texture_off_sample;
                 }
             }
         `

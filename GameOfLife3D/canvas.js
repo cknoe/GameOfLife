@@ -26,6 +26,27 @@ context.configure({
     device: device,
     format: canvasFormat, //texture format
 });
+canvas.addEventListener("click", async () => {
+    if (!document.pointerLockElement) {
+      await canvas.requestPointerLock({
+        unadjustedMovement: true,
+      });
+    }
+});
+document.addEventListener("pointerlockchange", lockChangeAlert, false);
+function lockChangeAlert() {
+    if (document.pointerLockElement === canvas) {
+      document.addEventListener("mousemove", updatePosition, false);
+    } else {
+      document.removeEventListener("mousemove", updatePosition, false);
+    }
+  }
+let mouseDeltaX = 0;
+let mouseDeltaY = 0;
+function updatePosition(e) {
+    mouseDeltaX = mouseDeltaX + e.movementX;
+    mouseDeltaY = mouseDeltaY + e.movementY;
+}
 
 // ------------------------------------------------ Vertices ------------------------------------------------
 // preparing a square, as two triangle (primitive), in canvas space (-1 to 1 2D plane)
@@ -108,36 +129,40 @@ const vertexBufferLayout = {
 
 
 // ------------------------------------------------ Texture ------------------------------------------------
-const textureWidth = 5;
-const textureHeight = 7;
+const imgOnResponse = await fetch('./faceon.png');
+const imageOnBitmap = await createImageBitmap(await imgOnResponse.blob());
 
-const _ = [255,   0,   0, 255];  // red
-const y = [255, 255,   0, 255];  // yellow
-const b = [  0,   0, 255, 255];  // blue
-const textureData = new Uint8Array([
-  b, _, _, _, _,
-  _, y, y, y, _,
-  _, y, _, _, _,
-  _, y, y, _, _,
-  _, y, _, _, _,
-  _, y, _, _, _,
-  _, _, _, _, _,
-].flat());
-
-const texture = device.createTexture({
-    size: [textureWidth, textureHeight],
+const textureOn = device.createTexture({
+    size: [imageOnBitmap.width, imageOnBitmap.height],
     format: 'rgba8unorm',
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 });
 
-device.queue.writeTexture(
-    { texture },
-    textureData,
-    { bytesPerRow: textureWidth * 4 },
-    { width: textureWidth, height: textureHeight },
+device.queue.copyExternalImageToTexture(
+    { source: imageOnBitmap },
+    { texture: textureOn },
+    [imageOnBitmap.width, imageOnBitmap.height]
 );
 
-const sampler = device.createSampler();
+const imgOffResponse = await fetch('./faceoff.png');
+const imageOffBitmap = await createImageBitmap(await imgOffResponse.blob());
+
+const textureOff = device.createTexture({
+    size: [imageOnBitmap.width, imageOnBitmap.height],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+});
+
+device.queue.copyExternalImageToTexture(
+    { source: imageOffBitmap },
+    { texture: textureOff },
+    [imageOffBitmap.width, imageOffBitmap.height]
+);
+
+const sampler = device.createSampler({
+magFilter: 'linear',
+minFilter: 'linear',
+});
 
 // ------------------------------------------------ Depth Stencil ------------------------------------------------
 
@@ -317,6 +342,11 @@ const bindGroupLayout = device.createBindGroupLayout({
         binding: 5,
         visibility: GPUShaderStage.FRAGMENT,
         texture: {} // texture
+    },
+    {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {} // texture
     },]
 });
 
@@ -348,7 +378,11 @@ const bindGroups = [
             },
             {
                 binding: 5,
-                resource: texture.createView()
+                resource: textureOn.createView()
+            },
+            {
+                binding: 6,
+                resource: textureOff.createView()
             }],
     }),
     device.createBindGroup({
@@ -377,7 +411,11 @@ const bindGroups = [
             },
             {
                 binding: 5,
-                resource: texture.createView()
+                resource: textureOn.createView()
+            },
+            {
+                binding: 6,
+                resource: textureOff.createView()
             }],
     }),
 ];
@@ -389,6 +427,7 @@ const pipelineLayout = device.createPipelineLayout({
 });
 
 // ------------------------------------------------ Render & Compute pass ------------------------------------------------
+
 function updateGrid() {
     // interface to save gpu commands
     const encoder = device.createCommandEncoder();
@@ -402,9 +441,9 @@ function updateGrid() {
     step++;
 
 
-    let rotationMatrix = rotationYMatrixFunction(((step * 0.5) % 360) * (Math.PI/180));
+    let rotationMatrix = rotationYMatrixFunction(((mouseDeltaX * 0.5) % 360) * (Math.PI/180));
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + orthographicMatrix.byteLength, rotationMatrix);
-    rotationMatrix = rotationXMatrixFunction(((step * 0.5) % 360) * (Math.PI/180));
+    rotationMatrix = rotationXMatrixFunction(((mouseDeltaY * 0.5) % 360) * (Math.PI/180));
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + orthographicMatrix.byteLength + rotationMatrix.byteLength, rotationMatrix);
 
     renderPass(device,
