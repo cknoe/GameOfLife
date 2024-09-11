@@ -24,8 +24,9 @@ export function cellShaderModule(device) {
 
             struct Matrix {
                 identity: mat3x3f,
-                rotation_y: mat3x3f,
-                rotation_x: mat3x3f,
+                orthographic_projection: mat4x4f,
+                rotation_y: mat4x4f,
+                rotation_x: mat4x4f,
             }
     
             // bind group as uniform variable describing data in the grid uniform buffer 
@@ -53,26 +54,27 @@ export function cellShaderModule(device) {
 
                 //output.pos = vec4f(projection, 1); Rendering square not placed an minimized
 
-                let rotation = matrixUniform.rotation_y * matrixUniform.rotation_x;
+                let rotation = matrixUniform.rotation_x * matrixUniform.rotation_y;
 
-                let scaleMatrix = mat3x3(
-                    vec3f(0.8/grid.x, 0, 0),
-                    vec3f(0, 0.8/grid.x, 0),
-                    vec3f(0, 0, 0.8/grid.x),
+                let scaleMatrix = mat4x4(
+                    vec4f(0.5/grid.x, 0, 0, 0),
+                    vec4f(0, 0.5/grid.x, 0, 0),
+                    vec4f(0, 0, 0.5/grid.x, 0),
+                    vec4f(0, 0, 0, 1),
                 );
 
-                let translateVector = vec3f(cellOffset - (grid-1)/grid, 0) ;
+                let translateVector = vec4f(cellOffset - (grid-1)/grid, 0, 0) ;
 
                 // placing square center at the top right of the canvas (pos+1 means vertices are placed at their position + (1,1))
                 // reducing its size to fit GRID_SIZE (/grid)
                 // placing it bottom left of canvas (-1)
                 // placing it at cell (relative to grid) with + cellOffset
                 //let squarePos = scaleMatrix * (position * state + 1) - 1 + vec3f(cellOffset, 0);
-                let position = scaleMatrix * (rotation * input.pos) + translateVector;
+                let position = rotation * (scaleMatrix * vec4f(input.pos, 1) + translateVector) + vec4f(0, 0, -15, 0);
+                //let position = vec4f(input.pos, 1);
     
-                // clip space on z is (0, 1) placing it at the center of simulation
-                let projection = vec3f(position.xy / 2, position.z + 0.5);
-                output.pos = vec4f(projection, 1);
+                let projection = matrixUniform.orthographic_projection * vec4f(position.xy / 2, position.z, 1);
+                output.pos = projection;
                 output.tex_coord = input.tex_coord;
                 output.cell = cell;
                 return output;

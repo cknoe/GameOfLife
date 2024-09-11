@@ -30,54 +30,54 @@ context.configure({
 // ------------------------------------------------ Vertices ------------------------------------------------
 // preparing a square, as two triangle (primitive), in canvas space (-1 to 1 2D plane)
 const vertices = new Float32Array([
-    // X,  Y,  Z, texture.x, texture.y
-    -0.8, -0.8, -0.8, 0, 0,
-    -0.8, 0.8, -0.8, 0, 1,
-    0.8, 0.8, -0.8, 1, 1,
+    // X,  Y,  Z, u, v
+    -1, -1, -1, 0, 1,
+    -1, 1, -1, 0, 0,
+    1, 1, -1, 1, 0,
 
-    -0.8, -0.8, -0.8, 0, 0,
-    0.8, -0.8, -0.8, 1, 0,
-    0.8, 0.8, -0.8, 1, 1,
+    -1, -1, -1, 0, 1,
+    1, -1, -1, 1, 1,
+    1, 1, -1, 1, 0,
     // 2
-    -0.8, -0.8, -0.8, 0, 0,
-    -0.8, -0.8, 0.8, 0, 1,
-    0.8, -0.8,  0.8, 1, 1,
+    -1, -1, -1, 0, 0,
+    -1, -1, 1, 0, 1,
+    1, -1,  1, 1, 1,
 
-    -0.8, -0.8, -0.8, 0, 0,
-    0.8, -0.8, -0.8, 1, 0,
-    0.8, -0.8, 0.8, 1, 1,
+    -1, -1, -1, 0, 0,
+    1, -1, -1, 1, 0,
+    1, -1, 1, 1, 1,
     // 3
-    -0.8, -0.8, -0.8, 0, 0,
-    -0.8, 0.8, -0.8, 0, 1,
-    -0.8, 0.8, 0.8, 1, 1,
+    -1, -1, -1, 0, 0,
+    -1, 1, -1, 0, 1,
+    -1, 1, 1, 1, 1,
 
-    -0.8, -0.8, -0.8, 0, 0,
-    -0.8, -0.8, 0.8, 1, 0,
-    -0.8, 0.8, 0.8, 1, 1,
+    -1, -1, -1, 0, 0,
+    -1, -1, 1, 1, 0,
+    -1, 1, 1, 1, 1,
     // 4
-    0.8, -0.8, -0.8, 0, 0,
-    0.8, 0.8, -0.8, 0, 1,
-    0.8, 0.8, 0.8, 1, 1,
+    1, -1, -1, 0, 0,
+    1, 1, -1, 0, 1,
+    1, 1, 1, 1, 1,
 
-    0.8, -0.8, -0.8, 0, 0,
-    0.8, -0.8, 0.8, 1, 0,
-    0.8, 0.8, 0.8, 1, 1,
+    1, -1, -1, 0, 0,
+    1, -1, 1, 1, 0,
+    1, 1, 1, 1, 1,
     // 5
-    -0.8, 0.8, -0.8, 0, 0,
-    -0.8, 0.8, 0.8, 0, 1,
-    0.8, 0.8, 0.8, 1, 1,
+    -1, 1, -1, 0, 0,
+    -1, 1, 1, 0, 1,
+    1, 1, 1, 1, 1,
 
-    -0.8, 0.8, -0.8, 0, 0,
-    0.8, 0.8, -0.8, 1, 0,
-    0.8, 0.8, 0.8, 1, 1,
+    -1, 1, -1, 0, 0,
+    1, 1, -1, 1, 0,
+    1, 1, 1, 1, 1,
     // 6
-    -0.8, -0.8, 0.8, 0, 0,
-    -0.8, 0.8, 0.8, 0, 1,
-    0.8, 0.8, 0.8, 1, 1,
+    -1, -1, 1, 0, 0,
+    -1, 1, 1, 0, 1,
+    1, 1, 1, 1, 1,
 
-    -0.8, -0.8, 0.8, 0, 0,
-    0.8, -0.8, 0.8, 1, 0,
-    0.8, 0.8, 0.8, 1, 1,
+    -1, -1, 1, 0, 0,
+    1, -1, 1, 1, 0,
+    1, 1, 1, 1, 1,
 ]);
 
 // creating GPUBuffer object
@@ -193,6 +193,7 @@ function rotationYMatrixFunction(theta) {
         Math.cos(theta), 0, Math.sin(theta), 0,
         0, 1, 0, 0,
         -Math.sin(theta), 0, Math.cos(theta), 0,
+        0, 0, 0, 1,
     ]);
 }
 var rotationYMatrix = rotationYMatrixFunction(rotationRadians);
@@ -202,17 +203,29 @@ function rotationXMatrixFunction(theta) {
         1, 0, 0, 0,
         0, Math.cos(theta), Math.sin(theta), 0,
         0, -Math.sin(theta), Math.cos(theta), 0,
+        0, 0, 0, 1,
     ]);
 }
 var rotationXMatrix = rotationXMatrixFunction(rotationRadians);
 
-const matrixSize = identityMatrix.byteLength + rotationYMatrix.byteLength + rotationXMatrix.byteLength;
+function orthographicMatrixFunction(left, right, bottom, top, near, far) {
+    return new Float32Array([
+        2 / (right - left), 0, 0, 0,
+        0, 2 / (top - bottom), 0, 0,
+        0, 0, -2 / (far - near), 0,
+        -(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1
+    ]);
+}
+const orthographicMatrix = orthographicMatrixFunction(-1, 1, -1, 1, 0.1, 20);
+
+const matrixSize = identityMatrix.byteLength + rotationYMatrix.byteLength + rotationXMatrix.byteLength + orthographicMatrix.byteLength;
 const matrixBuffer = device.createBuffer({
     label: "Matrix Buffer",
     size: matrixSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
 });
 device.queue.writeBuffer(matrixBuffer, 0, identityMatrix);
+device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, orthographicMatrix);
 
 
 
@@ -389,10 +402,10 @@ function updateGrid() {
     step++;
 
 
-    let rotationMatrix = rotationYMatrixFunction(((step * 2) % 360) * (Math.PI/180));
-    device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, rotationMatrix);
-    rotationMatrix = rotationXMatrixFunction(((step * 2) % 360) * (Math.PI/180));
-    device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + rotationMatrix.byteLength, rotationMatrix);
+    let rotationMatrix = rotationYMatrixFunction(((step * 0.5) % 360) * (Math.PI/180));
+    device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + orthographicMatrix.byteLength, rotationMatrix);
+    rotationMatrix = rotationXMatrixFunction(((step * 0.5) % 360) * (Math.PI/180));
+    device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + orthographicMatrix.byteLength + rotationMatrix.byteLength, rotationMatrix);
 
     renderPass(device,
         encoder,
