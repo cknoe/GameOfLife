@@ -84,8 +84,18 @@ export function cellShaderModule(device) {
                 // let cellRedGreen = input.cell / grid;
                 // calculating blue depending on red value
                 // return vec4f(cellRedGreen * state , (1 - cellRedGreen.x) * state ,1);
-                let texture_on_sample = textureSample(faceOnTexture, textureSampler, input.tex_coord);
-                let texture_off_sample = textureSample(faceOffTexture, textureSampler, input.tex_coord);
+                var color = vec4f(0);
+                if (input.cell.z <= 5) {
+                    color = vec4f(1, input.cell.z / 5, 0, 1);
+                } else if (input.cell.z <= 10) {
+                    color = vec4f(1 - (input.cell.z - 7) / 5, 1, 0, 1);
+                }else {
+                    color = vec4f(0, 1 - (input.cell.z - 10) / 6, (input.cell.z - 10) / 4, 1);
+                }
+                let texture_on_sample = 
+                    textureSample(faceOnTexture, textureSampler, input.tex_coord) * color;
+                let texture_off_sample = 
+                    textureSample(faceOffTexture, textureSampler, input.tex_coord) * color;
                 if (state == 1) {
                     return texture_on_sample;
                 } else {

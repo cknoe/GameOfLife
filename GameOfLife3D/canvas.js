@@ -135,6 +135,7 @@ const imageOnBitmap = await createImageBitmap(await imgOnResponse.blob());
 const textureOn = device.createTexture({
     size: [imageOnBitmap.width, imageOnBitmap.height],
     format: 'rgba8unorm',
+    alpha: 'premultiplied-alpha-blend',
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 });
 
