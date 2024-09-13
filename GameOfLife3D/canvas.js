@@ -6,7 +6,7 @@ let step = 0;
 let RUN_SIMULATION = 1;
 let computePhase = 1;
 const canvas = document.querySelector("canvas");
-const WORKGROUP_SIZE = 8;
+const WORKGROUP_SIZE = 4;
 
 // ------------------------------------------------ GPU Device ------------------------------------------------
 if (!navigator.gpu) {
@@ -235,13 +235,13 @@ var rotationXMatrix = rotationXMatrixFunction(rotationRadians);
 
 function orthographicMatrixFunction(left, right, bottom, top, near, far) {
     return new Float32Array([
-        2 / (right - left), 0, 0, 0,
-        0, 2 / (top - bottom), 0, 0,
-        0, 0, -2 / (far - near), 0,
-        -(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1
+        -2 / (left - right), 0, 0, 0,
+        0, -2 / (bottom - top), 0, 0,
+        0, 0, 2 / ( near - far), 0,
+        (right + left) / (left - right), (top + bottom) / (bottom - top), (far + near) / ( near - far), 1
     ]);
 }
-const orthographicMatrix = orthographicMatrixFunction(-1, 1, -1, 1, 0.1, 20);
+const orthographicMatrix = orthographicMatrixFunction(-2, 2, -2, 2, -100, 0.1);
 
 const matrixSize = identityMatrix.byteLength + rotationYMatrix.byteLength + rotationXMatrix.byteLength + orthographicMatrix.byteLength;
 const matrixBuffer = device.createBuffer({
@@ -281,7 +281,7 @@ readBackBuffer.unmap();
 // Create a uniform buffer that describes the grid
 /* Uniform buffer are used to pass data that stay identical each time they're called
 (compared to Vertex buffer which pass different value from its data each time its called)*/
-const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
+const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE, GRID_SIZE]);
 const uniformBuffer = device.createBuffer({
     label: "Grid Uniforms",
     size: uniformArray.byteLength,
@@ -291,7 +291,7 @@ device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
 
 // ------------------------------------------------ Creating Grid state storage buffer ------------------------------------------------
 // create a storage buffer representing grid (to activate cells)
-const cellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE);
+const cellStateArray = new Uint32Array(GRID_SIZE * GRID_SIZE * GRID_SIZE);
 const cellStateStorage = [
     device.createBuffer({
     label: "Cell State A",
