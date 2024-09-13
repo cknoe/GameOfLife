@@ -253,8 +253,6 @@ const matrixBuffer = device.createBuffer({
 device.queue.writeBuffer(matrixBuffer, 0, identityMatrix);
 device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength, orthographicMatrix);
 
-
-
 //---------- Some Buffer Logging
 const readBackBuffer = device.createBuffer({
     size: matrixSize,
@@ -269,14 +267,27 @@ device.queue.submit([commands]);
 await readBackBuffer.mapAsync(GPUMapMode.READ);
 const copyArrayBuffer = readBackBuffer.getMappedRange();
 const data = new Float32Array(copyArrayBuffer);
-console.log("Buffer data :")
-console.log(data);
+//console.log("Buffer data :")
+//console.log(data);
 readBackBuffer.unmap();
-//------------------------------------
 
 
+// ------------------------------------------------ Grid control ------------------------------------------------
+let sliceNumber = 0;
+const sliceNumberBuffer = device.createBuffer({
+    label: "Slice number",
+    size: 4,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+device.queue.writeBuffer(sliceNumberBuffer, 0, new Int32Array([sliceNumber]));
 
-
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'ArrowUp') {
+        sliceNumber = sliceNumber + 1 % GRID_SIZE;
+    } else if (event.key === 'ArrowDown') {
+        sliceNumber = sliceNumber === 0 ? GRID_SIZE : (sliceNumber - 1);
+    }
+});
 
 // ------------------------------------------------ Creating the grid size uniform buffer ------------------------------------------------
 // Create a uniform buffer that describes the grid
@@ -348,6 +359,11 @@ const bindGroupLayout = device.createBindGroupLayout({
         binding: 6,
         visibility: GPUShaderStage.FRAGMENT,
         texture: {} // texture
+    },
+    {
+        binding: 7,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: {} // texture
     },]
 });
 
@@ -384,6 +400,10 @@ const bindGroups = [
             {
                 binding: 6,
                 resource: textureOff.createView()
+            },
+            {
+                binding: 7,
+                resource: { buffer: sliceNumberBuffer }
             }],
     }),
     device.createBindGroup({
@@ -417,6 +437,10 @@ const bindGroups = [
             {
                 binding: 6,
                 resource: textureOff.createView()
+            },
+            {
+                binding: 7,
+                resource: { buffer: sliceNumberBuffer }
             }],
     }),
 ];
@@ -446,6 +470,8 @@ function updateGrid() {
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + orthographicMatrix.byteLength, rotationMatrix);
     rotationMatrix = rotationXMatrixFunction(((mouseDeltaY * 0.5) % 360) * (Math.PI/180));
     device.queue.writeBuffer(matrixBuffer, identityMatrix.byteLength + orthographicMatrix.byteLength + rotationMatrix.byteLength, rotationMatrix);
+
+    device.queue.writeBuffer(sliceNumberBuffer, 0, new Int32Array([sliceNumber]));
 
     renderPass(device,
         encoder,

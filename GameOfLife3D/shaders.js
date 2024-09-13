@@ -41,6 +41,8 @@ export function cellShaderModule(device) {
             @group(0) @binding(5) var faceOnTexture: texture_2d<f32>;
 
             @group(0) @binding(6) var faceOffTexture: texture_2d<f32>;
+
+            @group(0) @binding(7) var<uniform> slice_number: u32;
     
             // vertex shader is valid only when returning at least last vertex position
             @vertex
@@ -52,7 +54,7 @@ export function cellShaderModule(device) {
                 let cell  = vec3f(instance % grid.x, floor(instance / grid.x) % grid.x, floor( instance / (grid.x * grid.y))); //targeting cell grid depending on instance
                 //let state = f32(cellState[input.instance]);
     
-                let cellOffset = cell / grid * 2; //we only want to make the cell placed at 1/grid size of canvas (size 2 -1,1)
+                let cellOffset = vec3f(cell.xy / grid.xy * 2, (cell.z + f32(slice_number)) % grid.z / grid.z * 2); //we only want to make the cell placed at 1/grid size of canvas (size 2 -1,1)
 
                 let rotation = matrixUniform.rotation_x * matrixUniform.rotation_y;
 
